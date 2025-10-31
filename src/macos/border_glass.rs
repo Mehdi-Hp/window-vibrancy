@@ -105,7 +105,7 @@ pub unsafe fn apply_border_glass(
 
     container.addSubview_positioned_relativeTo(
         border_glass.as_ref(),
-        NSWindowOrderingMode::Above,
+        NSWindowOrderingMode::Below,
         None::<&NSView>,
     );
 
