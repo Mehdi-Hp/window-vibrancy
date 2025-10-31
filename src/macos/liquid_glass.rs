@@ -41,6 +41,7 @@ pub struct LiquidGlassOptions {
     pub radius: Option<f64>,
     pub opaque: Option<bool>,
     pub state: Option<crate::macos::NSVisualEffectState>,
+    pub content_inset: Option<f64>,
 }
 
 impl Default for LiquidGlassOptions {
@@ -51,6 +52,7 @@ impl Default for LiquidGlassOptions {
             radius: None,
             opaque: None,
             state: None,
+            content_inset: None,
         }
     }
 }
@@ -76,7 +78,23 @@ pub unsafe fn apply_liquid_glass(
     remove_existing_glass(container);
     remove_visual_effect_views(container);
 
-    let bounds = container.bounds();
+    let container_bounds = container.bounds();
+
+    let bounds = if let Some(inset) = options.content_inset {
+        NSRect {
+            origin: objc2_foundation::NSPoint {
+                x: inset,
+                y: inset,
+            },
+            size: objc2_foundation::NSSize {
+                width: container_bounds.size.width - (inset * 2.0),
+                height: container_bounds.size.height - (inset * 2.0),
+            },
+        }
+    } else {
+        container_bounds
+    };
+
     let use_opaque = options.opaque.unwrap_or(false);
     let background_view = if use_opaque {
         let bg = create_background_box(&mtm, bounds);
