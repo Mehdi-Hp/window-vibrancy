@@ -35,6 +35,10 @@ pub use macos::NSVisualEffectViewTagged;
 #[cfg(target_os = "macos")]
 pub use macos::{is_liquid_glass_supported, LiquidGlassOptions, NSGlassEffectVariant};
 
+// Border Glass types (macOS 26.0+)
+#[cfg(target_os = "macos")]
+pub use macos::BorderGlassOptions;
+
 /// a tuple of RGBA colors. Each value has minimum of 0 and maximum of 255.
 pub type Color = (u8, u8, u8, u8);
 
@@ -316,6 +320,69 @@ pub fn clear_liquid_glass(window: impl raw_window_handle::HasWindowHandle) -> Re
         },
         _ => Err(Error::UnsupportedPlatform(
             "\"clear_liquid_glass()\" is only supported on macOS.",
+        )),
+    }
+}
+
+/// Applies border glass effect to window. Works only on macOS 26.0+.
+///
+/// Creates a border with a different glass variant than the main window,
+/// positioned inset from the window edges.
+///
+/// ## Platform-specific
+///
+/// - **Linux / Windows**: Unsupported.
+///
+/// # Example
+///
+/// ```no_run
+/// use window_vibrancy::{apply_border_glass, BorderGlassOptions, NSGlassEffectVariant};
+///
+/// let options = BorderGlassOptions {
+///     variant: NSGlassEffectVariant::Clear,
+///     border_width: 1.0,
+///     radius: Some(12.0),
+///     ..Default::default()
+/// };
+///
+/// # let window: &dyn raw_window_handle::HasWindowHandle = unsafe { std::mem::zeroed() };
+/// apply_border_glass(&window, options).expect("Failed to apply border glass");
+/// ```
+#[cfg(target_os = "macos")]
+pub fn apply_border_glass(
+    window: impl raw_window_handle::HasWindowHandle,
+    #[allow(unused)] options: BorderGlassOptions,
+) -> Result<(), Error> {
+    match window.window_handle()?.as_raw() {
+        #[cfg(target_os = "macos")]
+        raw_window_handle::RawWindowHandle::AppKit(handle) => unsafe {
+            macos::apply_border_glass(handle.ns_view, options)
+        },
+        _ => Err(Error::UnsupportedPlatform(
+            "\"apply_border_glass()\" is only supported on macOS.",
+        )),
+    }
+}
+
+/// Clears border glass effect applied to window. Works only on macOS 26.0+.
+///
+/// ## Platform-specific
+///
+/// - **Linux / Windows**: Unsupported.
+///
+/// # Returns
+///
+/// - `Ok(true)` if the border glass effect was cleared
+/// - `Ok(false)` if the border glass effect was not previously applied by this crate.
+#[cfg(target_os = "macos")]
+pub fn clear_border_glass(window: impl raw_window_handle::HasWindowHandle) -> Result<bool, Error> {
+    match window.window_handle()?.as_raw() {
+        #[cfg(target_os = "macos")]
+        raw_window_handle::RawWindowHandle::AppKit(handle) => unsafe {
+            macos::clear_border_glass(handle.ns_view)
+        },
+        _ => Err(Error::UnsupportedPlatform(
+            "\"clear_border_glass()\" is only supported on macOS.",
         )),
     }
 }

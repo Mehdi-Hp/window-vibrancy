@@ -97,3 +97,10 @@ mod liquid_glass;
 pub use liquid_glass::{
     apply_liquid_glass, clear_liquid_glass, is_liquid_glass_supported, LiquidGlassOptions,
 };
+
+// Border Glass support (macOS 26.0+)
+#[cfg(target_os = "macos")]
+mod border_glass;
+
+#[cfg(target_os = "macos")]
+pub use border_glass::{apply_border_glass, clear_border_glass, BorderGlassOptions};
