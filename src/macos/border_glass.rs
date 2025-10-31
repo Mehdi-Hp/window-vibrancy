@@ -15,7 +15,10 @@ use crate::macos::ns_glass_effect_view::{
 };
 use crate::{Color, Error};
 
-const BORDER_GLASS_KEY: &str = "WindowVibrancyBorderGlassKey";
+const BORDER_GLASS_TOP_KEY: &str = "WindowVibrancyBorderGlassTopKey";
+const BORDER_GLASS_RIGHT_KEY: &str = "WindowVibrancyBorderGlassRightKey";
+const BORDER_GLASS_BOTTOM_KEY: &str = "WindowVibrancyBorderGlassBottomKey";
+const BORDER_GLASS_LEFT_KEY: &str = "WindowVibrancyBorderGlassLeftKey";
 
 extern "C" {
     fn objc_setAssociatedObject(
@@ -63,61 +66,71 @@ pub unsafe fn apply_border_glass(
 
     let container_bounds = container.bounds();
     let border_width = options.border_width;
+    let w = container_bounds.size.width;
+    let h = container_bounds.size.height;
 
-    let border_rect = NSRect {
-        origin: objc2_foundation::NSPoint {
-            x: border_width,
-            y: border_width,
-        },
-        size: objc2_foundation::NSSize {
-            width: container_bounds.size.width - (border_width * 2.0),
-            height: container_bounds.size.height - (border_width * 2.0),
-        },
-    };
+    let border_strips = [
+        ("top", NSRect {
+            origin: objc2_foundation::NSPoint { x: 0.0, y: h - border_width },
+            size: objc2_foundation::NSSize { width: w, height: border_width },
+        }, BORDER_GLASS_TOP_KEY, NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewMinYMargin),
 
-    let border_glass = if let Some(glass) =
-        unsafe { <NSGlassEffectView as NSGlassEffectViewExt>::new_with_frame(border_rect) }
-    {
-        unsafe {
-            let mask = NSAutoresizingMaskOptions::ViewWidthSizable
-                | NSAutoresizingMaskOptions::ViewHeightSizable;
-            glass.set_autoresizing_mask(mask);
-        }
+        ("right", NSRect {
+            origin: objc2_foundation::NSPoint { x: w - border_width, y: 0.0 },
+            size: objc2_foundation::NSSize { width: border_width, height: h },
+        }, BORDER_GLASS_RIGHT_KEY, NSAutoresizingMaskOptions::ViewHeightSizable | NSAutoresizingMaskOptions::ViewMinXMargin),
 
-        Retained::into_super(glass)
-    } else {
-        let visual = NSVisualEffectView::initWithFrame(mtm.alloc(), border_rect);
-        visual.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
-        visual.setMaterial(NSVisualEffectMaterial::UnderWindowBackground);
-        visual.setState(AppKitVisualEffectState::Active);
+        ("bottom", NSRect {
+            origin: objc2_foundation::NSPoint { x: 0.0, y: 0.0 },
+            size: objc2_foundation::NSSize { width: w, height: border_width },
+        }, BORDER_GLASS_BOTTOM_KEY, NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewMaxYMargin),
 
-        let mask = NSAutoresizingMaskOptions::ViewWidthSizable
-            | NSAutoresizingMaskOptions::ViewHeightSizable;
-        let view: &NSView = visual.as_ref();
-        view.setAutoresizingMask(mask);
+        ("left", NSRect {
+            origin: objc2_foundation::NSPoint { x: 0.0, y: 0.0 },
+            size: objc2_foundation::NSSize { width: border_width, height: h },
+        }, BORDER_GLASS_LEFT_KEY, NSAutoresizingMaskOptions::ViewHeightSizable | NSAutoresizingMaskOptions::ViewMaxXMargin),
+    ];
 
-        Retained::into_super(visual)
-    };
+    for (_edge_name, rect, key, autoresizing_mask) in border_strips.iter() {
+        let border_glass = if let Some(glass) =
+            unsafe { <NSGlassEffectView as NSGlassEffectViewExt>::new_with_frame(*rect) }
+        {
+            unsafe {
+                glass.set_autoresizing_mask(*autoresizing_mask);
+            }
+            Retained::into_super(glass)
+        } else {
+            let visual = NSVisualEffectView::initWithFrame(mtm.alloc(), *rect);
+            visual.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+            visual.setMaterial(NSVisualEffectMaterial::UnderWindowBackground);
+            visual.setState(AppKitVisualEffectState::Active);
 
-    set_border_glass_style(border_glass.as_ref(), options.variant)?;
-    configure_border_glass_appearance(border_glass.as_ref(), &options)?;
-    set_border_view_ignores_mouse_events(border_glass.as_ref(), true)?;
+            let view: &NSView = visual.as_ref();
+            view.setAutoresizingMask(*autoresizing_mask);
 
-    container.addSubview_positioned_relativeTo(
-        border_glass.as_ref(),
-        NSWindowOrderingMode::Below,
-        None::<&NSView>,
-    );
+            Retained::into_super(visual)
+        };
 
-    unsafe {
-        let key = BORDER_GLASS_KEY.as_ptr() as *const c_void;
-        let ptr = Retained::as_ptr(&border_glass) as *const c_void;
-        objc_setAssociatedObject(
-            container as *const _ as *const c_void,
-            key,
-            ptr,
-            OBJC_ASSOCIATION_RETAIN,
+        set_border_glass_style(border_glass.as_ref(), options.variant)?;
+        configure_border_glass_appearance(border_glass.as_ref(), &options)?;
+        set_border_view_ignores_mouse_events(border_glass.as_ref(), true)?;
+
+        container.addSubview_positioned_relativeTo(
+            border_glass.as_ref(),
+            NSWindowOrderingMode::Below,
+            None::<&NSView>,
         );
+
+        unsafe {
+            let key_ptr = key.as_ptr() as *const c_void;
+            let ptr = Retained::as_ptr(&border_glass) as *const c_void;
+            objc_setAssociatedObject(
+                container as *const _ as *const c_void,
+                key_ptr,
+                ptr,
+                OBJC_ASSOCIATION_RETAIN,
+            );
+        }
     }
 
     Ok(())
@@ -202,48 +215,76 @@ unsafe fn apply_corner_radius_layer(view: &NSView, radius: f64) {
     }
 }
 
-fn retained_border_glass_view(container: &NSView) -> Option<Retained<NSView>> {
+pub fn is_border_glass_view(container: &NSView, view: &NSView) -> bool {
+    let keys = [
+        BORDER_GLASS_TOP_KEY,
+        BORDER_GLASS_RIGHT_KEY,
+        BORDER_GLASS_BOTTOM_KEY,
+        BORDER_GLASS_LEFT_KEY,
+    ];
+
     unsafe {
-        let key = BORDER_GLASS_KEY.as_ptr() as *const c_void;
-        let ptr = objc_getAssociatedObject(container as *const _ as *const c_void, key);
-        if ptr.is_null() {
-            None
-        } else {
-            Retained::retain(ptr as *mut NSView)
+        let view_ptr = view as *const NSView;
+        for key in keys.iter() {
+            let key_ptr = key.as_ptr() as *const c_void;
+            let ptr = objc_getAssociatedObject(container as *const _ as *const c_void, key_ptr);
+            if !ptr.is_null() {
+                let border_ptr = ptr as *const NSView;
+                if border_ptr == view_ptr {
+                    return true;
+                }
+            }
         }
     }
-}
-
-pub fn is_border_glass_view(container: &NSView, view: &NSView) -> bool {
-    if let Some(border_glass) = retained_border_glass_view(container) {
-        let border_ptr = Retained::as_ptr(&border_glass) as *const NSView;
-        let view_ptr = view as *const NSView;
-        border_ptr == view_ptr
-    } else {
-        false
-    }
+    false
 }
 
 fn remove_existing_border_glass(container: &NSView) -> bool {
-    if let Some(border_glass) = retained_border_glass_view(container) {
-        let view: &NSView = border_glass.as_ref();
-        view.removeFromSuperview();
-        clear_associated_border_glass(container);
-        true
-    } else {
-        false
+    let keys = [
+        BORDER_GLASS_TOP_KEY,
+        BORDER_GLASS_RIGHT_KEY,
+        BORDER_GLASS_BOTTOM_KEY,
+        BORDER_GLASS_LEFT_KEY,
+    ];
+
+    let mut had_border = false;
+
+    for key in keys.iter() {
+        unsafe {
+            let key_ptr = key.as_ptr() as *const c_void;
+            let ptr = objc_getAssociatedObject(container as *const _ as *const c_void, key_ptr);
+            if !ptr.is_null() {
+                if let Some(border_glass) = Retained::retain(ptr as *mut NSView) {
+                    let view: &NSView = border_glass.as_ref();
+                    view.removeFromSuperview();
+                    had_border = true;
+                }
+            }
+        }
     }
+
+    clear_associated_border_glass(container);
+    had_border
 }
 
 fn clear_associated_border_glass(container: &NSView) {
+    let keys = [
+        BORDER_GLASS_TOP_KEY,
+        BORDER_GLASS_RIGHT_KEY,
+        BORDER_GLASS_BOTTOM_KEY,
+        BORDER_GLASS_LEFT_KEY,
+    ];
+
     unsafe {
-        let key = BORDER_GLASS_KEY.as_ptr() as *const c_void;
-        objc_setAssociatedObject(
-            container as *const _ as *const c_void,
-            key,
-            std::ptr::null(),
-            OBJC_ASSOCIATION_RETAIN,
-        );
+        for key in keys.iter() {
+            let key_ptr = key.as_ptr() as *const c_void;
+            objc_setAssociatedObject(
+                container as *const _ as *const c_void,
+                key_ptr,
+                std::ptr::null(),
+                OBJC_ASSOCIATION_RETAIN,
+            );
+        }
     }
 }
 
