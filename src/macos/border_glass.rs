@@ -169,7 +169,11 @@ fn create_border_mask(view: &NSView, border_width: f64, corner_radius: f64) {
 
         let _: () = msg_send![outer_path, setWindingRule: 1]; // NSEvenOddWindingRule = 1
 
-        let cg_path: *mut AnyObject = msg_send![outer_path, cgPath];
+        let cg_path: *const c_void = msg_send![outer_path, cgPath];
+        if cg_path.is_null() {
+            return;
+        }
+
         let _: () = msg_send![shape_layer, setPath: cg_path];
 
         let _: () = msg_send![layer, setMask: shape_layer];
