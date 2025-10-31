@@ -103,4 +103,4 @@ pub use liquid_glass::{
 mod border_glass;
 
 #[cfg(target_os = "macos")]
-pub use border_glass::{apply_border_glass, clear_border_glass, BorderGlassOptions};
+pub use border_glass::{apply_border_glass, clear_border_glass, is_border_glass_view, BorderGlassOptions};

@@ -214,6 +214,16 @@ fn retained_border_glass_view(container: &NSView) -> Option<Retained<NSView>> {
     }
 }
 
+pub fn is_border_glass_view(container: &NSView, view: &NSView) -> bool {
+    if let Some(border_glass) = retained_border_glass_view(container) {
+        let border_ptr = Retained::as_ptr(&border_glass) as *const NSView;
+        let view_ptr = view as *const NSView;
+        border_ptr == view_ptr
+    } else {
+        false
+    }
+}
+
 fn remove_existing_border_glass(container: &NSView) -> bool {
     if let Some(border_glass) = retained_border_glass_view(container) {
         let view: &NSView = border_glass.as_ref();

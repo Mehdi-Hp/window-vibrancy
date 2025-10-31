@@ -11,6 +11,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{MainThreadMarker, NSArray, NSRect};
 
+use crate::macos::border_glass::is_border_glass_view;
 use crate::macos::ns_glass_effect_view::{
     NSGlassEffectVariant, NSGlassEffectView, NSGlassEffectViewExt,
 };
@@ -350,7 +351,7 @@ fn remove_visual_effect_views(container: &NSView) {
 
             let is_visual: bool = msg_send![subview, isKindOfClass: visual_class];
 
-            if is_glass || is_visual {
+            if (is_glass || is_visual) && !is_border_glass_view(container, subview) {
                 views_to_remove.push(subview_ptr);
             }
         }
