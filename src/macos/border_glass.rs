@@ -141,11 +141,18 @@ fn create_border_mask(view: &NSView, border_width: f64, corner_radius: f64) {
 
         let shape_layer_class = objc2::class!(CAShapeLayer);
         let shape_layer: *mut AnyObject = msg_send![shape_layer_class, layer];
+        if shape_layer.is_null() {
+            return;
+        }
 
         let _: () = msg_send![shape_layer, setFrame: bounds];
 
         let bezier_path_class = objc2::class!(NSBezierPath);
         let outer_path: *mut AnyObject = msg_send![bezier_path_class, bezierPath];
+        if outer_path.is_null() {
+            return;
+        }
+
         let outer_rect = NSRect {
             origin: objc2_foundation::NSPoint { x: 0.0, y: 0.0 },
             size: objc2_foundation::NSSize { width: w, height: h },
@@ -153,6 +160,10 @@ fn create_border_mask(view: &NSView, border_width: f64, corner_radius: f64) {
         let _: () = msg_send![outer_path, appendBezierPathWithRoundedRect: outer_rect, xRadius: corner_radius, yRadius: corner_radius];
 
         let inner_path: *mut AnyObject = msg_send![bezier_path_class, bezierPath];
+        if inner_path.is_null() {
+            return;
+        }
+
         let inner_rect = NSRect {
             origin: objc2_foundation::NSPoint {
                 x: border_width,
