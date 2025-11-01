@@ -129,65 +129,96 @@ pub unsafe fn clear_border_glass(ns_view: NonNull<c_void>) -> Result<bool, Error
 
 fn create_border_mask(view: &NSView, border_width: f64, corner_radius: f64) {
     unsafe {
+        eprintln!("[BORDER_MASK] Starting create_border_mask with border_width={}, corner_radius={}", border_width, corner_radius);
+
         let _: () = msg_send![view, setWantsLayer: true];
         let layer: *mut AnyObject = msg_send![view, layer];
         if layer.is_null() {
+            eprintln!("[BORDER_MASK] Layer is null, returning early");
             return;
         }
+        eprintln!("[BORDER_MASK] Got layer successfully");
 
         let bounds: NSRect = msg_send![layer, bounds];
         let w = bounds.size.width;
         let h = bounds.size.height;
+        eprintln!("[BORDER_MASK] Layer bounds: width={}, height={}", w, h);
 
         let shape_layer_class = objc2::class!(CAShapeLayer);
         let shape_layer: *mut AnyObject = msg_send![shape_layer_class, layer];
         if shape_layer.is_null() {
+            eprintln!("[BORDER_MASK] shape_layer is null, returning early");
             return;
         }
+        eprintln!("[BORDER_MASK] Created CAShapeLayer successfully");
 
+        eprintln!("[BORDER_MASK] Setting shape_layer frame");
         let _: () = msg_send![shape_layer, setFrame: bounds];
+        eprintln!("[BORDER_MASK] Set shape_layer frame successfully");
 
         let bezier_path_class = objc2::class!(NSBezierPath);
         let outer_path: *mut AnyObject = msg_send![bezier_path_class, bezierPath];
         if outer_path.is_null() {
+            eprintln!("[BORDER_MASK] outer_path is null, returning early");
             return;
         }
+        eprintln!("[BORDER_MASK] Created outer NSBezierPath successfully");
 
         let outer_rect = NSRect {
             origin: objc2_foundation::NSPoint { x: 0.0, y: 0.0 },
             size: objc2_foundation::NSSize { width: w, height: h },
         };
+        eprintln!("[BORDER_MASK] About to append outer rounded rect: origin=(0,0), size=({},{}), radius={}", w, h, corner_radius);
         let _: () = msg_send![outer_path, appendBezierPathWithRoundedRect: outer_rect, xRadius: corner_radius, yRadius: corner_radius];
+        eprintln!("[BORDER_MASK] Appended outer path successfully");
 
         let inner_path: *mut AnyObject = msg_send![bezier_path_class, bezierPath];
         if inner_path.is_null() {
+            eprintln!("[BORDER_MASK] inner_path is null, returning early");
             return;
         }
+        eprintln!("[BORDER_MASK] Created inner NSBezierPath successfully");
 
+        let inner_width = w - (border_width * 2.0);
+        let inner_height = h - (border_width * 2.0);
         let inner_rect = NSRect {
             origin: objc2_foundation::NSPoint {
                 x: border_width,
                 y: border_width,
             },
             size: objc2_foundation::NSSize {
-                width: w - (border_width * 2.0),
-                height: h - (border_width * 2.0),
+                width: inner_width,
+                height: inner_height,
             },
         };
+        eprintln!("[BORDER_MASK] About to append inner rounded rect: origin=({},{}), size=({},{}), radius={}",
+            border_width, border_width, inner_width, inner_height, corner_radius);
         let _: () = msg_send![inner_path, appendBezierPathWithRoundedRect: inner_rect, xRadius: corner_radius.max(0.0), yRadius: corner_radius.max(0.0)];
+        eprintln!("[BORDER_MASK] Appended inner path successfully");
 
+        eprintln!("[BORDER_MASK] Appending inner path to outer path");
         let _: () = msg_send![outer_path, appendBezierPath: inner_path];
+        eprintln!("[BORDER_MASK] Appended paths successfully");
 
+        eprintln!("[BORDER_MASK] Setting winding rule");
         let _: () = msg_send![outer_path, setWindingRule: 1]; // NSEvenOddWindingRule = 1
+        eprintln!("[BORDER_MASK] Set winding rule successfully");
 
+        eprintln!("[BORDER_MASK] Getting cgPath from NSBezierPath");
         let cg_path: *const c_void = msg_send![outer_path, cgPath];
         if cg_path.is_null() {
+            eprintln!("[BORDER_MASK] cgPath is null, returning early");
             return;
         }
+        eprintln!("[BORDER_MASK] Got cgPath successfully");
 
+        eprintln!("[BORDER_MASK] Setting path on shape_layer");
         let _: () = msg_send![shape_layer, setPath: cg_path];
+        eprintln!("[BORDER_MASK] Set path successfully");
 
+        eprintln!("[BORDER_MASK] Setting mask on layer");
         let _: () = msg_send![layer, setMask: shape_layer];
+        eprintln!("[BORDER_MASK] Set mask successfully - DONE");
     }
 }
 
