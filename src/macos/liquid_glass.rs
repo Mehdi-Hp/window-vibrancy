@@ -42,6 +42,7 @@ pub struct LiquidGlassOptions {
     pub opaque: Option<bool>,
     pub state: Option<crate::macos::NSVisualEffectState>,
     pub content_inset: Option<f64>,
+    pub skip_content_reparenting: Option<bool>,
 }
 
 impl Default for LiquidGlassOptions {
@@ -53,6 +54,7 @@ impl Default for LiquidGlassOptions {
             opaque: None,
             state: None,
             content_inset: None,
+            skip_content_reparenting: None,
         }
     }
 }
@@ -74,7 +76,22 @@ pub unsafe fn apply_liquid_glass(
         "apply_liquid_glass must be called on main thread",
     ))?;
 
-    let container: &NSView = ns_view.cast().as_ref();
+    let view: &NSView = ns_view.cast().as_ref();
+
+    let container: &NSView = {
+        let window_ptr: *mut AnyObject = msg_send![view, window];
+        if !window_ptr.is_null() {
+            let content_view_ptr: *mut NSView = msg_send![window_ptr, contentView];
+            if !content_view_ptr.is_null() {
+                &*content_view_ptr
+            } else {
+                view
+            }
+        } else {
+            view
+        }
+    };
+
     remove_existing_glass(container);
     remove_visual_effect_views(container);
 
@@ -145,11 +162,13 @@ pub unsafe fn apply_liquid_glass(
         prepare_webview_with_optimization(webview.as_ref())?;
     }
 
-    move_primary_content_view(
-        container,
-        glass_view.as_ref(),
-        options.radius.unwrap_or(0.0),
-    );
+    if !options.skip_content_reparenting.unwrap_or(false) {
+        move_primary_content_view(
+            container,
+            glass_view.as_ref(),
+            options.radius.unwrap_or(0.0),
+        );
+    }
 
     if let Some(ref bg) = background_view {
         container.addSubview_positioned_relativeTo(

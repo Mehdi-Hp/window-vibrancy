@@ -32,6 +32,9 @@ pub unsafe fn apply_vibrancy(
             ));
         }
 
+        // Clear any existing vibrancy view to prevent duplicates
+        let _ = clear_vibrancy(ns_view);
+
         let mut m = NSVisualEffectMaterial(appearance as isize);
         if (appearance as u32 > 9 && NSAppKitVersionNumber < NSAppKitVersionNumber10_14)
             || (appearance as u32 > 4 && NSAppKitVersionNumber < NSAppKitVersionNumber10_11)
