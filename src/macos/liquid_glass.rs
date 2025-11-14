@@ -9,7 +9,7 @@ use objc2_app_kit::{
     NSVisualEffectBlendingMode, NSVisualEffectMaterial,
     NSVisualEffectState as AppKitVisualEffectState, NSVisualEffectView, NSWindowOrderingMode,
 };
-use objc2_foundation::{MainThreadMarker, NSArray, NSRect};
+use objc2_foundation::{ns_string, MainThreadMarker, NSArray, NSRect};
 
 use crate::macos::border_glass::is_border_glass_view;
 use crate::macos::ns_glass_effect_view::{
@@ -99,10 +99,7 @@ pub unsafe fn apply_liquid_glass(
 
     let bounds = if let Some(inset) = options.content_inset {
         NSRect {
-            origin: objc2_foundation::NSPoint {
-                x: inset,
-                y: inset,
-            },
+            origin: objc2_foundation::NSPoint { x: inset, y: inset },
             size: objc2_foundation::NSSize {
                 width: container_bounds.size.width - (inset * 2.0),
                 height: container_bounds.size.height - (inset * 2.0),
@@ -308,6 +305,8 @@ unsafe fn apply_corner_radius_layer(view: &NSView, radius: f64) {
     let layer: *mut AnyObject = msg_send![view, layer];
     if !layer.is_null() {
         let _: () = msg_send![layer, setCornerRadius: radius];
+        let corner_curve = ns_string!("continuous");
+        let _: () = msg_send![layer, setCornerCurve: corner_curve];
         let _: () = msg_send![layer, setMasksToBounds: true];
     }
 }
